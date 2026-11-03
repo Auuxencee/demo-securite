@@ -1,0 +1,61 @@
+# security-template: dependabot
+# =============================================================================
+#  Dependabot - Mises à jour automatiques des dépendances
+# -----------------------------------------------------------------------------
+#  Dependabot a deux fonctions distinctes :
+#    1. Alertes + "security updates" : PR automatiques qui corrigent une
+#       dépendance VULNÉRABLE. Activées dans les réglages du repo (par
+#       setup.sh) et indépendantes de ce fichier.
+#    2. "Version updates" : PR régulières pour rester à jour, même sans
+#       vulnérabilité connue. C'est ce que configure ce fichier.
+#  Gratuit sur tous les repos, publics comme privés.
+#
+#  Fichier généré depuis CONFIGURATION.md (clés DEPENDENCY_MANIFESTS,
+#  DEPENDABOT_INTERVAL, DEPENDABOT_COOLDOWN_DAYS).
+#  Pour ajouter un écosystème ou un dossier, dupliquez un bloc ci-dessous.
+# =============================================================================
+
+version: 2
+
+updates:
+  # Actions GitHub utilisées par les workflows : garde à jour les SHA épinglés
+  # (le commentaire de version "# vX.Y.Z" est mis à jour en même temps).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Délai de "refroidissement" : une nouvelle version n'est proposée qu'après
+    # N jours, le temps qu'une éventuelle version piégée soit détectée et retirée.
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]                 # une seule PR groupée pour toutes les actions
+    labels: ["dependencies", "ci"]
+
+  - package-ecosystem: "pip"
+    directory: "/demo/app"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 10
+    groups:
+      # Corrections de sécurité regroupées dans une PR distincte, prioritaire.
+      security-1:
+        applies-to: security-updates
+        patterns: ["*"]
+      # Montées de version mineures/correctives regroupées pour limiter le bruit.
+      minor-and-patch-1:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+    labels: ["dependencies"]
+
+  # Image de base Docker (instruction FROM).
+  - package-ecosystem: "docker"
+    directory: "/demo"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    labels: ["dependencies", "docker"]
