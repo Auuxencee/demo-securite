@@ -1,0 +1,3 @@
+# Fins de ligne Unix pour tous les fichiers texte : les scripts Bash ne
+# fonctionnent pas avec des fins de ligne Windows (CRLF), même sous Git Bash.
+* text=auto eol=lf

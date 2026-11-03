@@ -1,0 +1,149 @@
+# security-template: docker
+# =============================================================================
+#  Conteneur - Scan de l'image Docker avec Trivy
+# -----------------------------------------------------------------------------
+#  Rôle      : construire l'image du projet et y rechercher les CVE (paquets
+#              OS de l'image de base + dépendances applicatives embarquées)
+#              ainsi que les secrets oubliés dans les couches.
+#  Résultats : onglet "Security > Code scanning" (outil "Trivy") + rapport
+#              SARIF téléchargeable dans les artefacts du run.
+#  Blocage   : le job échoue au-delà du seuil de gravité défini.
+#  Récurrence: le scan planifié détecte les CVE publiées APRÈS le build, sur
+#              une image qui n'a pas changé.
+#  Licence   : outil open source. L'envoi vers l'onglet Security nécessite
+#              "GitHub Code Security" sur un repo privé ; sans licence, le
+#              rapport reste disponible en artefact et le contrôle bloquant
+#              fonctionne normalement.
+#
+#  Fichier généré depuis CONFIGURATION.md (clés ENABLE_DOCKER, IMAGE_NAME,
+#  DOCKERFILE_PATH, BUILD_CONTEXT, PRIVATE_REGISTRY, FAIL_ON_SEVERITY...).
+#  Ne renommez pas le "name" du job : il sert de check obligatoire dans le ruleset.
+#
+#  Sécurité de la chaîne d'approvisionnement : les actions sont épinglées par
+#  empreinte de commit (SHA) et non par tag. En mars 2026, la quasi-totalité
+#  des tags de aquasecurity/trivy-action ont été réécrits vers du code
+#  malveillant (CVE-2026-33634) ; un épinglage par SHA protège de ce scénario.
+# =============================================================================
+
+name: "Container - Trivy image"
+
+on:
+  push:
+    branches: ["<<DEFAULT_BRANCH>>"]
+  pull_request:
+    branches: ["<<DEFAULT_BRANCH>>"]
+  schedule:
+    - cron: "<<SCAN_SCHEDULE_CRON>>"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: container-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: "<<IMAGE_NAME>>"
+  DOCKERFILE_PATH: "<<DOCKERFILE_PATH>>"
+  BUILD_CONTEXT: "<<BUILD_CONTEXT>>"
+  # Gravités qui font échouer le job.
+  FAIL_ON_SEVERITY: "<<TRIVY_SEVERITIES>>"
+  # Version de Trivy figée pour la reproductibilité. À mettre à jour
+  # manuellement (Dependabot ne suit pas ce paramètre).
+  TRIVY_VERSION: "v0.70.0"
+
+jobs:
+  image-scan:
+    name: "Container - Trivy (image)"
+    if: vars.SECURITY_SCANS_ENABLED != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write            # publier le SARIF dans l'onglet Security
+      actions: read
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # >>> IF:PRIVATE_REGISTRY
+      # Identifiants stockés dans les secrets GitHub Actions du repo
+      # (envoyés par setup.sh depuis .env).
+      - name: Connexion au registre privé
+        shell: bash
+        env:
+          REGISTRY: "<<PRIVATE_REGISTRY>>"
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          printf '%s' "${REGISTRY_PASSWORD}" \
+            | docker login "${REGISTRY}" --username "${REGISTRY_USERNAME}" --password-stdin
+      # <<< IF:PRIVATE_REGISTRY
+
+      - name: Construction de l'image
+        shell: bash
+        run: |
+          # Ne passez jamais de secret en --build-arg : il serait visible dans
+          # l'historique de l'image (utilisez "docker build --secret").
+          docker build \
+            --file "${DOCKERFILE_PATH}" \
+            --tag "${IMAGE_NAME}:${GITHUB_SHA}" \
+            "${BUILD_CONTEXT}"
+
+      # 1) Rapport complet (toutes gravités) au format SARIF, non bloquant.
+      - name: Scan Trivy - rapport SARIF
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: "${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          scanners: vuln,secret
+          format: sarif
+          output: trivy-image.sarif
+          exit-code: "0"
+          # Exceptions documentées (justifiées et datées) : .trivyignore
+          trivyignores: .trivyignore
+
+      - name: Publication dans l'onglet Security
+        if: always() && hashFiles('trivy-image.sarif') != ''
+        # Non bloquant : échoue sans licence Code Security (repo privé) ou sur
+        # une PR provenant d'un fork. Le rapport reste disponible en artefact.
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: trivy-image.sarif
+          category: container-image
+
+      - name: Archivage du rapport
+        if: always() && hashFiles('trivy-image.sarif') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: trivy-image-report
+          path: trivy-image.sarif
+          retention-days: <<REPORT_RETENTION_DAYS>>
+
+      # 2) Contrôle bloquant : seulement les gravités retenues.
+      - name: Contrôle bloquant
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          skip-setup-trivy: true        # Trivy déjà installé par l'étape précédente
+          scan-type: image
+          image-ref: "${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          scanners: vuln,secret
+          format: table
+          severity: ${{ env.FAIL_ON_SEVERITY }}
+          # true : seules les failles ayant un correctif disponible bloquent.
+          ignore-unfixed: <<TRIVY_IGNORE_UNFIXED>>
+          exit-code: "1"
+          trivyignores: .trivyignore
+      # >>> IF:PRIVATE_REGISTRY
+
+      - name: Déconnexion du registre privé
+        if: always()
+        shell: bash
+        run: docker logout "<<PRIVATE_REGISTRY>>" || true
+      # <<< IF:PRIVATE_REGISTRY

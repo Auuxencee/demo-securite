@@ -1,0 +1,20 @@
+# security-template: dast
+# =============================================================================
+#  Règles OWASP ZAP (scan baseline) - format : ID<TAB>ACTION<TAB>(description)
+#  ACTION : IGNORE (masqué) | WARN (signalé, non bloquant) | FAIL (bloquant)
+#  Les règles absentes de ce fichier sont en WARN.
+#  Liste des identifiants : https://www.zaproxy.org/docs/alerts/
+#  Toute modification est soumise à l'équipe sécurité (.github/CODEOWNERS).
+# =============================================================================
+10010	FAIL	(Cookie sans attribut HttpOnly)
+10023	FAIL	(Messages d'erreur de débogage exposés)
+90022	FAIL	(Divulgation d'erreur applicative)
+10098	FAIL	(CORS trop permissif)
+10038	WARN	(En-tête Content-Security-Policy absent - passer en FAIL une fois la CSP en place)
+10020	WARN	(En-tête anti-clickjacking absent)
+10021	WARN	(En-tête X-Content-Type-Options absent)
+10035	WARN	(En-tête Strict-Transport-Security absent - sans objet en HTTP local)
+10011	WARN	(Cookie sans attribut Secure - sans objet en HTTP local)
+10036	WARN	(Version du serveur divulguée dans l'en-tête Server)
+10096	IGNORE	(Horodatage divulgué - bruit fréquent)
+10027	IGNORE	(Commentaires suspects dans le code HTML - bruit fréquent)

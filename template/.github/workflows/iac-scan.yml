@@ -1,0 +1,99 @@
+# security-template: iac
+# =============================================================================
+#  IaC - Détection de mauvaises configurations avec Trivy
+# -----------------------------------------------------------------------------
+#  Rôle      : analyser l'Infrastructure as Code et les fichiers de
+#              déploiement : Terraform, CloudFormation, Kubernetes, Helm,
+#              Dockerfile, Docker Compose, ARM/Bicep...
+#              Exemples détectés : bucket public, port SSH ouvert sur
+#              Internet, conteneur exécuté en root, chiffrement désactivé.
+#  Résultats : onglet "Security > Code scanning" + rapport SARIF en artefact.
+#  Blocage   : le job échoue au-delà du seuil de gravité défini.
+#  Licence   : outil open source (même remarque que container-scan.yml pour
+#              l'envoi vers l'onglet Security).
+#
+#  Fichier généré depuis CONFIGURATION.md (clés ENABLE_IAC, IAC_PATH,
+#  FAIL_ON_SEVERITY).
+#  Ne renommez pas le "name" du job : il sert de check obligatoire dans le ruleset.
+# =============================================================================
+
+name: "IaC - Trivy config"
+
+on:
+  push:
+    branches: ["<<DEFAULT_BRANCH>>"]
+  pull_request:
+    branches: ["<<DEFAULT_BRANCH>>"]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: iac-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IAC_PATH: "<<IAC_PATH>>"
+  FAIL_ON_SEVERITY: "<<TRIVY_SEVERITIES>>"
+  TRIVY_VERSION: "v0.70.0"
+
+jobs:
+  iac-scan:
+    name: "IaC - Trivy (config)"
+    if: vars.SECURITY_SCANS_ENABLED != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Scan IaC - rapport SARIF
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: config
+          scan-ref: ${{ env.IAC_PATH }}
+          format: sarif
+          output: trivy-iac.sarif
+          exit-code: "0"
+          # Exceptions documentées (justifiées et datées) : .trivyignore
+          trivyignores: .trivyignore
+          # Variables Terraform nécessaires à l'évaluation :
+          # tf-vars: ./infra/terraform.tfvars
+          # Dossiers à exclure (séparés par des virgules) :
+          # skip-dirs: ./infra/legacy
+
+      - name: Publication dans l'onglet Security
+        if: always() && hashFiles('trivy-iac.sarif') != ''
+        continue-on-error: true         # voir remarque licence en en-tête
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: trivy-iac.sarif
+          category: iac
+
+      - name: Archivage du rapport
+        if: always() && hashFiles('trivy-iac.sarif') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: trivy-iac-report
+          path: trivy-iac.sarif
+          retention-days: <<REPORT_RETENTION_DAYS>>
+
+      - name: Contrôle bloquant
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          skip-setup-trivy: true
+          scan-type: config
+          scan-ref: ${{ env.IAC_PATH }}
+          format: table
+          severity: ${{ env.FAIL_ON_SEVERITY }}
+          exit-code: "1"
+          trivyignores: .trivyignore

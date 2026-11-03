@@ -1,0 +1,97 @@
+# security-template: sast
+# =============================================================================
+#  SAST - Analyse statique du code avec CodeQL (GitHub Code Scanning)
+# -----------------------------------------------------------------------------
+#  Rôle      : détecter les vulnérabilités dans le code source (injections,
+#              XSS, désérialisation dangereuse, path traversal, etc.).
+#  Résultats : onglet "Security > Code scanning" + annotations dans les PR.
+#  Blocage   : via la règle "code_scanning" du ruleset de la branche
+#              principale (gravité définie par CODEQL_BLOCK_SEVERITY).
+#  Licence   : gratuit sur repo public ; "GitHub Code Security" requis sur
+#              repo privé d'organisation.
+#
+#  Fichier généré depuis CONFIGURATION.md (clés ENABLE_SAST, CODEQL_*).
+#  Ne renommez pas le "name" du job : il sert de référence dans le ruleset.
+#  Incompatible avec le "default setup" CodeQL activé dans l'interface.
+# =============================================================================
+
+name: "SAST - CodeQL"
+
+on:
+  push:
+    branches: ["<<DEFAULT_BRANCH>>"]
+  pull_request:
+    branches: ["<<DEFAULT_BRANCH>>"]
+  schedule:
+    # Analyse récurrente : de nouvelles requêtes CodeQL peuvent révéler des
+    # failles dans du code qui n'a pas changé.
+    - cron: "<<SCAN_SCHEDULE_CRON>>"
+  workflow_dispatch:                    # lancement manuel depuis l'onglet Actions
+
+# Principe du moindre privilège : aucun droit par défaut, droits accordés job par job.
+permissions: {}
+
+# Annule une analyse en cours si un nouveau commit arrive sur la même branche/PR.
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: "SAST - CodeQL (${{ matrix.language }})"
+    # Interrupteur d'urgence : la variable de repo SECURITY_SCANS_ENABLED=false
+    # désactive tous les scans sans supprimer les fichiers.
+    if: vars.SECURITY_SCANS_ENABLED != 'false'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      security-events: write            # publier les résultats dans l'onglet Security
+      contents: read                    # lire le code
+      actions: read                     # requis sur les repos privés
+      packages: read                    # télécharger des packs CodeQL privés éventuels
+
+    strategy:
+      fail-fast: false                  # un langage en échec n'interrompt pas les autres
+      matrix:
+        include:
+          # >>> GEN:CODEQL_MATRIX
+          - language: python
+            build-mode: none
+            runner: ubuntu-latest
+          # <<< GEN:CODEQL_MATRIX
+          # Analyse des workflows GitHub Actions eux-mêmes (injections de
+          # commandes, permissions excessives...).
+          - language: actions
+            build-mode: none
+            runner: ubuntu-latest
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false    # ne laisse pas le token Git sur le disque du runner
+
+      - name: Initialisation de CodeQL
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # Suite de requêtes, chemins exclus... : .github/codeql/codeql-config.yml
+          config-file: ./.github/codeql/codeql-config.yml
+
+      # >>> IF:CODEQL_MANUAL_BUILD
+      # Langages compilés en mode "manual" : installez la chaîne de build
+      # (ex : actions/setup-java) avant cette étape si l'image du runner ne
+      # la fournit pas.
+      - name: Build manuel
+        if: matrix.build-mode == 'manual'
+        shell: bash
+        run: |
+          <<CODEQL_BUILD_COMMAND>>
+      # <<< IF:CODEQL_MANUAL_BUILD
+
+      - name: Analyse CodeQL
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          # Catégorie distincte par langage pour ne pas écraser les résultats.
+          category: "/language:${{ matrix.language }}"

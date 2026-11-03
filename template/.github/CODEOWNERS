@@ -1,0 +1,50 @@
+# security-template: codeowners
+# =============================================================================
+#  CODEOWNERS - Responsables de revue par zone du code
+# -----------------------------------------------------------------------------
+#  Chaque ligne associe un motif de chemin à un ou plusieurs propriétaires
+#  (@utilisateur ou @organisation/equipe). Quand une PR modifie un fichier
+#  couvert, ses propriétaires sont ajoutés automatiquement comme relecteurs.
+#
+#  Combiné à l'option "Require review from Code Owners" du ruleset (activée
+#  par scripts/enable-security.sh), leur approbation devient OBLIGATOIRE :
+#  personne ne peut désactiver un scan ou ajouter une exception sans l'accord
+#  de l'équipe sécurité.
+#
+#  Règles de syntaxe :
+#    - la DERNIÈRE ligne qui correspond à un fichier l'emporte ;
+#    - les équipes doivent avoir au moins un accès en écriture au repo ;
+#    - un propriétaire invalide est signalé par GitHub dans l'onglet du fichier.
+#
+#  Fichier généré depuis CONFIGURATION.md (clés DEFAULT_OWNERS, SECURITY_OWNERS).
+# =============================================================================
+
+# Propriétaires par défaut de tout le repo.
+*                           <<DEFAULT_OWNERS>>
+
+# --- Fichiers sensibles pour la sécurité ------------------------------------
+
+# Pipelines CI/CD et configuration des scans
+/.github/                   <<SECURITY_OWNERS>>
+
+# Exceptions et règles des outils de sécurité
+# >>> IF:TRIVY_FILES
+/.trivyignore               <<SECURITY_OWNERS>>
+# <<< IF:TRIVY_FILES
+# >>> IF:GITLEAKS_FILES
+/.gitleaks.toml             <<SECURITY_OWNERS>>
+# <<< IF:GITLEAKS_FILES
+# >>> IF:DAST
+/.zap/                      <<SECURITY_OWNERS>>
+# <<< IF:DAST
+# >>> IF:PRECOMMIT
+/.pre-commit-config.yaml    <<SECURITY_OWNERS>>
+# <<< IF:PRECOMMIT
+# >>> IF:SECURITY_POLICY
+/SECURITY.md                <<SECURITY_OWNERS>>
+# <<< IF:SECURITY_POLICY
+
+# Autres zones sensibles : décommentez et adaptez les chemins.
+# /Dockerfile               <<SECURITY_OWNERS>>
+# /infra/                   @mon-org/equipe-infra <<SECURITY_OWNERS>>
+# /src/auth/                @mon-org/equipe-dev <<SECURITY_OWNERS>>

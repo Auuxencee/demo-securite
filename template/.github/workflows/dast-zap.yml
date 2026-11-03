@@ -1,0 +1,126 @@
+# security-template: dast
+# =============================================================================
+#  DAST - Scan dynamique "baseline" avec OWASP ZAP
+# -----------------------------------------------------------------------------
+#  Rôle      : analyser l'application EN FONCTIONNEMENT pour détecter ce que
+#              l'analyse du code ne voit pas : en-têtes de sécurité
+#              manquants, cookies mal configurés, fuite d'informations...
+#              Le mode "baseline" explore le site et analyse les réponses
+#              SANS lancer d'attaque active : il est sans danger pour
+#              l'application ciblée.
+#  Cible     : mode "local" (image du projet lancée sur le runner) ou
+#              "remote" (environnement déjà déployé, jamais la production
+#              sans accord écrit).
+#  Résultats : rapports HTML/JSON/Markdown en artefact "zap-baseline-report".
+#  Blocage   : uniquement sur les règles classées FAIL dans .zap/rules.tsv.
+#
+#  Fichier généré depuis CONFIGURATION.md (clés ENABLE_DAST, DAST_*).
+# =============================================================================
+
+name: "DAST - ZAP baseline"
+
+on:
+  push:
+    branches: ["<<DEFAULT_BRANCH>>"]
+  # >>> IF:DAST_ON_PR
+  pull_request:
+    branches: ["<<DEFAULT_BRANCH>>"]
+  # <<< IF:DAST_ON_PR
+  schedule:
+    - cron: "<<SCAN_SCHEDULE_CRON>>"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: dast-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TARGET_URL: "<<DAST_TARGET_URL>>"
+  HEALTHCHECK_PATH: "<<DAST_HEALTHCHECK_PATH>>"
+  # >>> IF:DAST_LOCAL
+  IMAGE_NAME: "<<IMAGE_NAME>>"
+  DOCKERFILE_PATH: "<<DOCKERFILE_PATH>>"
+  BUILD_CONTEXT: "<<BUILD_CONTEXT>>"
+  PORT_MAPPING: "<<PORT_MAPPING>>"
+  # <<< IF:DAST_LOCAL
+
+jobs:
+  zap-baseline:
+    name: "DAST - ZAP baseline"
+    if: vars.SECURITY_SCANS_ENABLED != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # >>> IF:DAST_REGISTRY
+
+      - name: Connexion au registre privé
+        shell: bash
+        env:
+          REGISTRY: "<<PRIVATE_REGISTRY>>"
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          printf '%s' "${REGISTRY_PASSWORD}" \
+            | docker login "${REGISTRY}" --username "${REGISTRY_USERNAME}" --password-stdin
+      # <<< IF:DAST_REGISTRY
+      # >>> IF:DAST_LOCAL
+
+      - name: Démarrage de l'application sur le runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --file "${DOCKERFILE_PATH}" --tag "${IMAGE_NAME}:dast" "${BUILD_CONTEXT}"
+          # Variables nécessaires au démarrage (valeurs de TEST uniquement) :
+          # ajoutez par exemple  --env DATABASE_URL=...
+          docker run --detach --name app-under-test --publish "${PORT_MAPPING}" "${IMAGE_NAME}:dast"
+      # <<< IF:DAST_LOCAL
+
+      - name: Attente de disponibilité de l'application
+        shell: bash
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sSfo /dev/null "${TARGET_URL}${HEALTHCHECK_PATH}"; then
+              echo "Application disponible après $((i * 2)) s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Application injoignable sur ${TARGET_URL}${HEALTHCHECK_PATH}"
+          docker logs app-under-test 2>/dev/null || true
+          exit 1
+
+      - name: Scan ZAP baseline
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        # >>> IF:DAST_AUTH
+        # Scan authentifié : l'en-tête est ajouté à chaque requête vers la cible.
+        env:
+          ZAP_AUTH_HEADER: "<<DAST_AUTH_HEADER>>"
+          ZAP_AUTH_HEADER_VALUE: ${{ secrets.DAST_AUTH_HEADER_VALUE }}
+          ZAP_AUTH_HEADER_SITE: "<<DAST_TARGET_HOST>>"
+        # <<< IF:DAST_AUTH
+        with:
+          target: ${{ env.TARGET_URL }}
+          # Niveau de chaque règle (IGNORE / WARN / FAIL) : .zap/rules.tsv
+          rules_file_name: .zap/rules.tsv
+          # -I : les avertissements (WARN) ne font pas échouer le job, seules
+          # les règles FAIL bloquent.
+          cmd_options: "-I"
+          fail_action: true
+          allow_issue_writing: false    # pas de création automatique d'issues
+          artifact_name: zap-baseline-report
+      # >>> IF:DAST_LOCAL
+
+      - name: Arrêt de l'application
+        if: always()
+        shell: bash
+        run: docker rm --force app-under-test || true
+      # <<< IF:DAST_LOCAL
