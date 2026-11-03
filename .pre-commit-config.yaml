@@ -1,0 +1,22 @@
+# security-template: precommit
+# =============================================================================
+#  Hooks pre-commit - contrôle sur le poste du développeur
+# -----------------------------------------------------------------------------
+#  Bloque un commit contenant un secret AVANT même qu'il n'existe dans
+#  l'historique Git (plus rapide et moins coûteux qu'une détection en CI).
+#
+#  Installation (une fois par poste) :
+#      pip install pre-commit
+#      pre-commit install
+#  Exécution manuelle sur tout le repo :
+#      pre-commit run --all-files
+#
+#  Remarque : un hook local peut être contourné (git commit --no-verify).
+#  Il complète la CI et la push protection, il ne les remplace pas.
+# =============================================================================
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1                        # même version que secrets-scan.yml
+    hooks:
+      - id: gitleaks

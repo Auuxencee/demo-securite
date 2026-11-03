@@ -1,0 +1,31 @@
+# security-template: sast
+# =============================================================================
+#  Configuration CodeQL (utilisée par .github/workflows/codeql.yml)
+# =============================================================================
+
+name: "Configuration CodeQL"
+
+# Suite de requêtes (CONFIGURATION.md : CODEQL_QUERY_SUITE) :
+#   default              -> peu de faux positifs, couverture réduite
+#   security-extended    -> plus de règles de sécurité, un peu plus de bruit
+#   security-and-quality -> sécurité + qualité de code, le plus verbeux
+queries:
+  - uses: security-extended
+
+# Chemins exclus de l'analyse : code généré, dépendances vendorisées, jeux de
+# tests volontairement vulnérables... Toute exclusion doit être justifiée
+# (voir la procédure d'exceptions). Sans effet pour les langages compilés
+# analysés en mode autobuild/manual.
+paths-ignore:
+  - "**/node_modules/**"
+  - "**/vendor/**"
+  # - "**/test/**"
+
+# Restreindre l'analyse à certains dossiers (monorepo) :
+# paths:
+#   - src
+
+# Désactiver une règle précise jugée non pertinente (à justifier) :
+# query-filters:
+#   - exclude:
+#       id: py/clear-text-logging-sensitive-data

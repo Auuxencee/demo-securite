@@ -1,4 +1,8 @@
-# Configuration de la sécurité du projet
+# Configuration de la sécurité du projet (démo)
+
+> Configuration de démonstration pour l'application vulnérable de `demo/`.
+> Copie : `cp demo/CONFIGURATION.demo.md CONFIGURATION.md`, puis renseignez
+> `GITHUB_REPO` et remplacez `@votre-compte` par votre compte GitHub.
 
 C'est **le seul fichier à remplir** (les secrets éventuels vont dans `.env`).
 Une fois rempli, lancez :
@@ -22,7 +26,7 @@ bash scripts/setup.sh
 
 | Paramètre | Valeur | Aide |
 |---|---|---|
-| `GITHUB_REPO` |  | Repo au format `owner/nom`. Vide = générer les fichiers sans toucher à GitHub |
+| `GITHUB_REPO` | Auuxencee/demo-securite | Repo au format `owner/nom`. Vide = générer les fichiers sans toucher à GitHub |
 | `DEFAULT_BRANCH` | main | Branche principale à protéger |
 
 ## 2. Scans et fichiers à installer
@@ -33,7 +37,7 @@ bash scripts/setup.sh
 - [x] **Détection de secrets dans l'historique Git** (Gitleaks) · `ENABLE_SECRETS_SCAN`
 - [x] **Scan de l'image Docker** (Trivy) · `ENABLE_DOCKER` · le projet a un Dockerfile
 - [x] **Scan de l'Infrastructure as Code** (Trivy) · `ENABLE_IAC` · Terraform, Kubernetes, Helm, Dockerfile...
-- [ ] **Scan dynamique de l'application** (OWASP ZAP) · `ENABLE_DAST` · le projet expose une interface HTTP
+- [x] **Scan dynamique de l'application** (OWASP ZAP) · `ENABLE_DAST` · le projet expose une interface HTTP
 - [x] **Détection de secrets avant chaque commit** (pre-commit + Gitleaks) · `ENABLE_PRECOMMIT`
 - [x] **Relecteurs obligatoires par zone du code** (CODEOWNERS) · `ENABLE_CODEOWNERS`
 - [x] **Politique de signalement des vulnérabilités** (SECURITY.md) · `ENABLE_SECURITY_POLICY`
@@ -53,7 +57,7 @@ Appliqués automatiquement si `GITHUB_REPO` est renseigné.
 
 | Paramètre | Valeur | Aide |
 |---|---|---|
-| `REQUIRED_APPROVALS` | 1 | Approbations exigées avant merge. `0` pour un projet solo |
+| `REQUIRED_APPROVALS` | 0 | Approbations exigées avant merge. `0` pour un projet solo |
 
 ## 4. Seuils de blocage
 
@@ -78,7 +82,7 @@ Appliqués automatiquement si `GITHUB_REPO` est renseigné.
 
 | Paramètre | Valeur | Aide |
 |---|---|---|
-| `DEPENDENCY_MANIFESTS` | pip:/ | `ecosysteme:/dossier`, séparés par des virgules. Ex : `pip:/,npm:/frontend`. Les actions GitHub et Docker sont ajoutées automatiquement |
+| `DEPENDENCY_MANIFESTS` | pip:/demo/app | `ecosysteme:/dossier`, séparés par des virgules. Ex : `pip:/,npm:/frontend`. Les actions GitHub et Docker sont ajoutées automatiquement |
 | `DEPENDABOT_INTERVAL` | weekly | `daily` · `weekly` · `monthly` |
 | `DEPENDABOT_COOLDOWN_DAYS` | 7 | Jours d'attente avant de proposer une nouvelle version |
 
@@ -86,16 +90,16 @@ Appliqués automatiquement si `GITHUB_REPO` est renseigné.
 
 | Paramètre | Valeur | Aide |
 |---|---|---|
-| `IMAGE_NAME` | mon-app | Nom local de l'image, en minuscules |
-| `DOCKERFILE_PATH` | ./Dockerfile | Chemin depuis la racine du repo |
-| `BUILD_CONTEXT` | . | Contexte de build |
+| `IMAGE_NAME` | demo-app | Nom local de l'image, en minuscules |
+| `DOCKERFILE_PATH` | ./demo/Dockerfile | Chemin depuis la racine du repo |
+| `BUILD_CONTEXT` | ./demo | Contexte de build |
 | `PRIVATE_REGISTRY` |  | Registre privé de l'image de base (ex : `ghcr.io`). Identifiants dans `.env` |
 
 ## 8. Infrastructure as Code (si IaC coché)
 
 | Paramètre | Valeur | Aide |
 |---|---|---|
-| `IAC_PATH` | . | Dossier analysé. `.` = tout le repo. Ex : `./infra` |
+| `IAC_PATH` | ./demo | Dossier analysé. `.` = tout le repo. Ex : `./infra` |
 
 ## 9. Scan dynamique (si DAST coché)
 
@@ -113,14 +117,14 @@ Appliqués automatiquement si `GITHUB_REPO` est renseigné.
 
 | Paramètre | Valeur | Aide |
 |---|---|---|
-| `DEFAULT_OWNERS` | @mon-org/equipe-dev | Relecteurs de tout le code : `@utilisateur` ou `@org/equipe`, séparés par des espaces |
-| `SECURITY_OWNERS` | @mon-org/equipe-securite | Relecteurs obligatoires des fichiers de sécurité |
+| `DEFAULT_OWNERS` | @Auuxencee | Relecteurs de tout le code : `@utilisateur` ou `@org/equipe`, séparés par des espaces |
+| `SECURITY_OWNERS` | @Auuxencee | Relecteurs obligatoires des fichiers de sécurité |
 
 ## 11. Politique de sécurité (si SECURITY.md coché)
 
 | Paramètre | Valeur | Aide |
 |---|---|---|
-| `SECURITY_CONTACT_EMAIL` | securite@mon-entreprise.fr | Adresse de signalement |
+| `SECURITY_CONTACT_EMAIL` | securite@example.com | Adresse de signalement |
 | `SUPPORTED_VERSION` | 1.x | Version maintenue |
 | `ACK_DELAY` | 2 jours ouvrés | Délai d'accusé de réception |
 | `TRIAGE_DELAY` | 5 jours ouvrés | Délai d'analyse |
@@ -135,4 +139,4 @@ Appliqués automatiquement si `GITHUB_REPO` est renseigné.
 
 ## 13. Finalisation
 
-- [ ] **Conserver la documentation après nettoyage** · `KEEP_DOCUMENTATION` · le README est conservé sous le nom `SECURITE-CICD.md`
+- [x] **Conserver la documentation après nettoyage** · `KEEP_DOCUMENTATION` · le README est conservé sous le nom `SECURITE-CICD.md`

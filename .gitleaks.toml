@@ -1,0 +1,41 @@
+# security-template: gitleaks-files
+# =============================================================================
+#  Configuration Gitleaks
+# -----------------------------------------------------------------------------
+#  Par défaut, Gitleaks applique ses ~200 règles intégrées (clés AWS, tokens
+#  GitHub, Slack, Stripe, clés privées, etc.). Ce fichier permet :
+#    - d'ajouter des règles pour des formats de secrets propres à l'entreprise ;
+#    - de déclarer des exceptions (faux positifs) de manière tracée.
+#
+#  Toute modification est soumise à l'équipe sécurité (voir .github/CODEOWNERS).
+#  Alternative ponctuelle : ajouter le commentaire "gitleaks:allow" sur la
+#  ligne concernée du code (à réserver aux faux positifs évidents).
+#
+# =============================================================================
+
+title = "Configuration Gitleaks du projet"
+
+# Conserve toutes les règles par défaut de Gitleaks.
+[extend]
+useDefault = true
+
+# Règle personnalisée : exemple pour un format de token interne.
+# [[rules]]
+# id = "token-interne"
+# description = "Token d'API interne"
+# regex = '''INT-[A-Z0-9]{32}'''
+# keywords = ["INT-"]
+
+# Exceptions globales. Chaque entrée doit être justifiée.
+[[allowlists]]
+description = "Fichiers sans secret réel : documentation et jeux de données de test"
+paths = [
+  '''(^|/)docs/''',
+  # Exemple : fixtures de test contenant de faux identifiants.
+  # '''(^|/)tests/fixtures/''',
+]
+
+# Exception sur une valeur précise (ex : clé de démonstration publique).
+# [[allowlists]]
+# description = "Clé d'exemple de la documentation éditeur, non valide"
+# regexes = ['''AKIAIOSFODNN7EXAMPLE''']

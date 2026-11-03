@@ -1,0 +1,25 @@
+# security-template: trivy-files
+# =============================================================================
+#  Exceptions Trivy (scan d'image et scan IaC)
+# -----------------------------------------------------------------------------
+#  Une ligne = un identifiant ignoré : CVE-xxxx (vulnérabilité) ou identifiant
+#  de règle IaC tel qu'affiché par Trivy (ex : DS-0002, AWS-0086).
+#
+#  RÈGLES D'USAGE :
+#    1. Toujours un commentaire au-dessus : justification, auteur, ticket.
+#    2. Toujours une date d'expiration "exp:AAAA-MM-JJ" : passée cette date,
+#       l'exception est ignorée et l'alerte réapparaît, ce qui force une
+#       nouvelle revue.
+#    3. Toute modification de ce fichier est soumise à l'équipe sécurité
+#       (voir .github/CODEOWNERS).
+#
+#  Exemple (à adapter, ne pas décommenter tel quel) :
+#
+#  # Faux positif : la fonction vulnérable de libxyz n'est jamais appelée.
+#  # Auteur : prenom.nom | Ticket : SEC-123 | Validé par : equipe-securite
+#  CVE-2024-12345 exp:2026-12-31
+#
+#  # Risque accepté en attente du correctif éditeur (aucune version corrigée).
+#  # Auteur : prenom.nom | Ticket : SEC-124 | Validé par : equipe-securite
+#  DS-0002 exp:2026-12-31
+# =============================================================================
